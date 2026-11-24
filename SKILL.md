@@ -20,6 +20,8 @@ compatibility: Requires Python 3 and the Claude Code VS Code extension (Windows,
    - `Ctrl+Alt+Enter` 승인, `Ctrl+Alt+Backspace` 거절
    - `Ctrl+Alt+Z` 거절 이유 입력칸으로 이동 (권한 창이 없으면 채팅 입력칸으로 이동, `index.js`의 `focus_last_message` 분기 패치 + `keys.js`의 `window.foolHasPrompt`)
    - `Ctrl+Alt+H` history (채팅 패널만)
+5. **PDF 링크 페이지 열기** — 채팅의 `파일.pdf#L16` 링크를 누르면 PDF 뷰어(tomoki1207.pdf)에서 16페이지로 연다.
+   - Link a PDF page as `[text](file.pdf#L<page>)`.
 
 VS Code Remote-WSL이면 확장 webview는 WSL 쪽(`~/.vscode-server/extensions/...-linux-x64`)이 쓰이므로 WSL에서 실행해야 한다. Windows 로컬 VS Code는 Windows의 Claude Code에서 실행.
 
@@ -41,6 +43,6 @@ VS Code Remote-WSL이면 확장 webview는 WSL 쪽(`~/.vscode-server/extensions/
 
 ## 주의
 
-- 확장 업데이트마다 새 버전 폴더가 생기므로 2번을 다시 실행해야 함 (훅은 그대로 유지됨).
+- 확장 업데이트마다 새 버전 폴더가 생기므로 2번을 다시 실행해야 함 (훅은 그대로 유지됨). PDF 뷰어 확장이 업데이트돼도 마찬가지.
 - settings.json을 고치기 전 `settings.json.fool-bak`으로 백업함.
 - 훅 `allow`도 Claude Code가 항상 묻는 위험 동작(중요 경로 `rm` 등)은 우회하지 못함.

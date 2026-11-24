@@ -17,7 +17,10 @@ Parts:
   5. Keybindings: for keys pressed outside the webview, add to the VS Code user keybindings.json
      Ctrl+Alt+Enter / Backspace / Z -> accept / reject / reason (via 3), and
      Ctrl+Alt+Up/Down/PgUp/PgDn/Home/End -> scroll, in a text diff only.
-  Patched files (2-4) keep their original as <name>.orig; patches are always made from it.
+  6. PDF links: chat links like `file.pdf#L16` open in the PDF viewer extension (tomoki1207.pdf)
+     at page 16. extension.js (3) calls pdfPreview.setPage; the PDF viewer gets assets/pdf-page.js
+     (out/src/extension.js), assets/pdf-page-viewer.js (lib/main.js) and an activation event (package.json).
+  Patched files (2-4, 6) keep their original as <name>.orig; patches are always made from it.
 
 Usage:
   python3 apply.py                 # apply
@@ -107,8 +110,27 @@ EXT_PATCHES = [
      r'focusLastMessage(foolArg){let \1=this.pickOneChatSurface();if(!\1)return!1;return \1.comms.notifyFocusLastMessage(foolArg),'),
     (re.compile(r'async notifyFocusLastMessage\(\)\{(await this\.clientReady,this\.send\(\{type:"request",channelId:"",requestId:"",request:\{type:"focus_last_message")\}'),
      r'async notifyFocusLastMessage(foolArg){\1,fool:foolArg}'),
+    # openFile: a PDF link (`file.pdf#L16`) opens in the PDF viewer at that page (pdfPreview.setPage, see PDF_JS).
+    #   let i=ee.Uri.file(s),a=!0;...n?.pinned&&{preview:!1}};ee.window.showTextDocument(i,d).then((p)=>{if(t?.searchText)
+    (re.compile(r'(let ([\w$]+)=([\w$]+)\.Uri\.file\(([\w$]+)\),([\w$]+)=!0;.{0,1500}?\.pinned&&\{preview:!1\}\};)'
+                r'(?=\3\.window\.showTextDocument\(\2,([\w$]+)\)\.then\(\([\w$]+\)=>\{if\(([\w$]+)\?\.searchText\))', re.S),
+     r'\1if(/\\.pdf$/i.test(\4)&&\5){/*fool:pdf-page*/let foolPg=\7?.startLine;'
+     r'Promise.resolve(foolPg?\3.commands.executeCommand("pdfPreview.setPage",\4,foolPg):!1).catch(()=>!1)'
+     r'.then(()=>\3.commands.executeCommand("vscode.openWith",\2,"pdf.preview",\6))'
+     r'.then(void 0,()=>\3.commands.executeCommand("vscode.open",\2,\6));return}'),
 ]
 EXT_MARK = "foolArg"
+PDF_MARK = "/*fool:pdf-page*/"
+
+# PDF viewer extension (tomoki1207.pdf). A UI extension, so under Remote-WSL it is on the Windows side.
+#   assets/pdf-page.js -> out/src/extension.js: command pdfPreview.setPage(fsPath, page)
+#   assets/pdf-page-viewer.js -> lib/main.js: open at that page, or jump to it if already open
+PDF_JS = [
+    ("out/src/extension.js", SKILL_DIR / "assets" / "pdf-page.js"),
+    ("lib/main.js", SKILL_DIR / "assets" / "pdf-page-viewer.js"),
+]
+PDF_ACTIVATION = "onCommand:pdfPreview.setPage"  # added to package.json activationEvents
+PDF_EXT_ROOTS = EXT_ROOTS + sorted(Path("/mnt/c/Users").glob("*/.vscode/extensions"))
 
 MD_KEYS_JS = SKILL_DIR / "assets" / "md-preview-keys.js"
 MD_GLOBS = [
@@ -221,6 +243,35 @@ def extension_patch(text):
     for rx, sub in EXT_PATCHES:
         text = rx.sub(sub, text)
     return text, True
+
+
+def pdf_js_patch(asset):
+    def transform(text):
+        return text + "\n;" + PDF_MARK + asset.read_text(encoding="utf-8"), True
+    return transform
+
+
+def pdf_package_patch(text):
+    data = json.loads(text)
+    data.setdefault("activationEvents", []).append(PDF_ACTIVATION)
+    return json.dumps(data, indent=2, ensure_ascii=False) + "\n", True
+
+
+def pdf_version_key(p):
+    # tomoki1207.pdf-1.2.2 -> (1, 2, 2)
+    m = re.match(r"tomoki1207\.pdf-(\d+(?:\.\d+)*)", p.name)
+    return tuple(int(x) for x in m.group(1).split(".")) if m else ()
+
+
+def find_pdf_ext():
+    found = []
+    for root in PDF_EXT_ROOTS:
+        if not root.is_dir():
+            continue
+        dirs = [d for d in root.glob("tomoki1207.pdf-*") if d.is_dir() and pdf_version_key(d)]
+        if dirs:
+            found.append(max(dirs, key=pdf_version_key))
+    return found
 
 
 def md_preview_patch(text):
@@ -378,12 +429,19 @@ def main():
     targets = find_index_js()
     for t in targets:
         files.append((t, webview_patch(a.label, a.description), webview_marks(a.label)))
-        files.append((t.parent.parent / "extension.js", extension_patch, [("focusLastMessage arg", EXT_MARK)]))
+        files.append((t.parent.parent / "extension.js", extension_patch,
+                      [("focusLastMessage arg", EXT_MARK), ("PDF link page", PDF_MARK)]))
     files += [(p, md_preview_patch, [("md preview shortcuts", KEYS_MARK)]) for p in find_md_preview_js()]
+    pdf_exts = find_pdf_ext()
+    for d in pdf_exts:
+        files += [(d / rel, pdf_js_patch(asset), [("PDF page", PDF_MARK)]) for rel, asset in PDF_JS]
+        files.append((d / "package.json", pdf_package_patch, [("PDF page activation", PDF_ACTIVATION)]))
 
     print("Files:")
     if not targets:
         print("  [none] no anthropic.claude-code-* found under " + ", ".join(map(str, EXT_ROOTS)))
+    if not pdf_exts:
+        print("  [none] no tomoki1207.pdf-* found (PDF links open without a page)")
     ok = True
     for f, transform, marks in files:
         if a.restore:
