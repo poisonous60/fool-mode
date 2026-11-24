@@ -27,22 +27,23 @@ VS Code Remote-WSL이면 확장 webview는 WSL 쪽(`~/.vscode-server/extensions/
 
 ## 절차
 
-1. 먼저 상태 확인:
+1. 스킬 폴더에서 `git pull --ff-only`.
+2. 먼저 상태 확인:
    ```
    python3 scripts/apply.py --check
    ```
    (Windows는 `python3` 대신 `python`)
-2. 사용자에게 무엇이 바뀌는지(확장 파일, settings.json, keybindings.json) 알리고 적용:
+3. 사용자에게 무엇이 바뀌는지(확장 파일, settings.json, keybindings.json) 알리고 적용:
    ```
    python3 scripts/apply.py
    ```
    - 이름 바꾸기: `--label "이름" --description "설명"`
    - 되돌리기: `--restore` (index.js 원복 + 훅 등록 해제 + keybindings.json 블록 제거, 훅 파일은 남김)
-3. 출력에 `[FAIL] ... found N`이 나오면 확장 코드 구조가 바뀐 것. `webview/index.js`에서 `label:"Edit automatically"` 주변을 grep해서 `apply.py`의 `PATTERN`을 고친다 (사용자에게 먼저 보여주고).
-4. 사용자에게 VS Code에서 `Developer: Reload Window` 하라고 안내. 훅은 새 세션부터 확실히 적용됨.
+4. 출력에 `[FAIL] ... found N`이 나오면 확장 코드 구조가 바뀐 것. `webview/index.js`에서 `label:"Edit automatically"` 주변을 grep해서 `apply.py`의 `PATTERN`을 고친다 (사용자에게 먼저 보여주고).
+5. 사용자에게 VS Code에서 `Developer: Reload Window` 하라고 안내. 훅은 새 세션부터 확실히 적용됨.
 
 ## 주의
 
-- 확장 업데이트마다 새 버전 폴더가 생기므로 2번을 다시 실행해야 함 (훅은 그대로 유지됨). PDF 뷰어 확장이 업데이트돼도 마찬가지.
+- 확장 업데이트마다 새 버전 폴더가 생기므로 3번을 다시 실행해야 함 (훅은 그대로 유지됨). PDF 뷰어 확장이 업데이트돼도 마찬가지.
 - settings.json을 고치기 전 `settings.json.fool-bak`으로 백업함.
 - 훅 `allow`도 Claude Code가 항상 묻는 위험 동작(중요 경로 `rm` 등)은 우회하지 못함.
