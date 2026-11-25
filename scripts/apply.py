@@ -17,6 +17,8 @@ Parts:
   5. Keybindings: for keys pressed outside the webview, add to the VS Code user keybindings.json
      Ctrl+Alt+Enter / Backspace / Z -> accept / reject / reason (via 3), and
      Ctrl+Alt+Up/Down/PgUp/PgDn/Home/End -> scroll, in a text diff only.
+     The same entries go into the extension's package.json (contributes.keybindings), so they also
+     work in a VS Code window connected over SSH / WSL without touching that client's keybindings.json.
   6. PDF links: chat links like `file.pdf#L16` open in the PDF viewer extension (tomoki1207.pdf)
      at page 16. extension.js (3) calls pdfPreview.setPage; the PDF viewer gets assets/pdf-page.js
      (out/src/extension.js), assets/pdf-page-viewer.js (lib/main.js) and an activation event (package.json).
@@ -113,7 +115,7 @@ EXT_PATCHES = [
     # openFile: a PDF link (`file.pdf#L16`) opens in the PDF viewer at that page (pdfPreview.setPage, see PDF_JS).
     #   let i=ee.Uri.file(s),a=!0;...n?.pinned&&{preview:!1}};ee.window.showTextDocument(i,d).then((p)=>{if(t?.searchText)
     (re.compile(r'(let ([\w$]+)=([\w$]+)\.Uri\.file\(([\w$]+)\),([\w$]+)=!0;.{0,1500}?\.pinned&&\{preview:!1\}\};)'
-                r'(?=\3\.window\.showTextDocument\(\2,([\w$]+)\)\.then\(\([\w$]+\)=>\{if\(([\w$]+)\?\.searchText\))', re.S),
+                r'(?=(?:if\([^{}]*\)\{[^{}]*return\})?\3\.window\.showTextDocument\(\2,([\w$]+)\)\.then\(\([\w$]+\)=>\{if\(([\w$]+)\?\.searchText\))', re.S),
      r'\1if(/\\.pdf$/i.test(\4)&&\5){/*fool:pdf-page*/let foolPg=\7?.startLine;'
      r'Promise.resolve(foolPg?\3.commands.executeCommand("pdfPreview.setPage",\4,foolPg):!1).catch(()=>!1)'
      r'.then(()=>\3.commands.executeCommand("vscode.openWith",\2,"pdf.preview",\6))'
@@ -135,6 +137,7 @@ PDF_EXT_ROOTS = EXT_ROOTS + sorted(Path("/mnt/c/Users").glob("*/.vscode/extensio
 MD_KEYS_JS = SKILL_DIR / "assets" / "md-preview-keys.js"
 MD_GLOBS = [
     (HOME / ".vscode-server" / "bin", "*/extensions/markdown-language-features/media/index.js"),
+    (HOME / ".vscode-server" / "cli" / "servers", "*/server/extensions/markdown-language-features/media/index.js"),
     (Path("/mnt/c/Users"), "*/AppData/Local/Programs/Microsoft VS Code/*/resources/app/extensions/markdown-language-features/media/index.js"),
     (Path("/mnt/c/Users"), "*/AppData/Local/Programs/Microsoft VS Code/resources/app/extensions/markdown-language-features/media/index.js"),
 ]
@@ -243,6 +246,21 @@ def extension_patch(text):
     for rx, sub in EXT_PATCHES:
         text = rx.sub(sub, text)
     return text, True
+
+
+def ext_package_patch(text):
+    # KB_ENTRIES as contributes.keybindings of the extension itself: keybindings contributed by an
+    # extension on the SSH / WSL server side apply in the connected VS Code window.
+    data = json.loads(text)
+    kbs = data.setdefault("contributes", {}).setdefault("keybindings", [])
+    for key, cmd, args, when in KB_ENTRIES:
+        e = {"command": cmd, "key": key}
+        if args is not None:
+            e["args"] = args
+        if when is not None:
+            e["when"] = when
+        kbs.append(e)
+    return json.dumps(data, indent=2, ensure_ascii=False) + "\n", True
 
 
 def pdf_js_patch(asset):
@@ -431,6 +449,8 @@ def main():
         files.append((t, webview_patch(a.label, a.description), webview_marks(a.label)))
         files.append((t.parent.parent / "extension.js", extension_patch,
                       [("focusLastMessage arg", EXT_MARK), ("PDF link page", PDF_MARK)]))
+        files.append((t.parent.parent / "package.json", ext_package_patch,
+                      [("keybindings in extension", '"ctrl+alt+enter"')]))
     files += [(p, md_preview_patch, [("md preview shortcuts", KEYS_MARK)]) for p in find_md_preview_js()]
     pdf_exts = find_pdf_ext()
     for d in pdf_exts:
