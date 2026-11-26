@@ -71,11 +71,14 @@ PATTERN = re.compile(
 # Full-editor guards around the native diff tab:
 #   permission handler, Edit and Write branches:
 #     if(window.IS_FULL_EDITOR)return;let n=new AbortController;...t.openDiff(...)
+#     2.1.332+: if(window.IS_FULL_EDITOR||t.config.value?.confined)return;let r=new AbortController;
+#     (only IS_FULL_EDITOR is removed; the confined check stays)
 #   accept path that saves through the open diff tab:
 #     if(window.IS_FULL_EDITOR||!t.acceptDiff||b!==null)return;
 # (regex, replacement, expected match count)
 DIFF_PATCHES = [
-    (re.compile(r'if\(window\.IS_FULL_EDITOR\)return;(let [\w$]+=new AbortController;)'), r'\1', 2),
+    (re.compile(r'if\(window\.IS_FULL_EDITOR(?:\|\|([\w$]+\.config\.value\?\.confined))?\)return;(let [\w$]+=new AbortController;)'),
+     lambda m: (f'if({m[1]})return;' if m[1] else '') + m[2], 2),
     (re.compile(r'if\(window\.IS_FULL_EDITOR\|\|(![\w$]+\.acceptDiff\|\|)'), r'if(\1', 1),
 ]
 DIFF_MARK = "/*fool:full-editor-diff*/"
