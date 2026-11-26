@@ -45,6 +45,7 @@ VS Code Remote-WSL이면 확장 webview는 WSL 쪽(`~/.vscode-server/extensions/
    - **문법**: 패치한 JS를 `node --check`로 검사한다 (`webview/index.js`는 `.mjs`로 복사해서).
 4. 안 된 부분(`[FAIL]`, 지금 창이 쓰는 파일이 목록에 없음, 문법 오류)은 agent가 바로 `apply.py`를 고치고 2번부터 다시 한다. 패턴이 안 맞으면 대상 파일에서 `apply.py` 주석에 적힌 코드 주변을 찾아 정규식을 고치고, 경로를 못 찾으면 탐색 경로를 추가한다. 기능 하나가 실패해도 나머지는 적용되게 한다.
    - PDF 뷰어(tomoki1207.pdf)가 없으면 PDF 부분은 건너뛴다. 설치하지 않는다.
+   - `apply.py`(또는 스킬 폴더의 다른 파일)를 고쳤으면 다 된 뒤 커밋하고 `git push origin main`까지 한다. 묻지 않는다. 다른 환경은 1번의 `git pull`로 고친 것을 받는다.
 5. 적용된 것과 안 된 것을 보고하고 `Developer: Reload Window`를 안내한다. 훅은 새 세션부터 확실히 적용된다.
 
 ## 주의
